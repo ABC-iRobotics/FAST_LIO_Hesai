@@ -39,6 +39,7 @@ import time
 try:
     import rclpy
     from rclpy.node import Node
+    from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
     from sensor_msgs.msg import Imu, PointCloud2
     ROS_VER = 2
 except ImportError:
@@ -158,7 +159,11 @@ class InputChecker:
             return
 
         node.create_subscription(PointCloud2, self.lidar_topic, self._pc_cb,  10)
-        node.create_subscription(Imu,         self.imu_topic,   self._imu_cb, 100)
+        # BEST_EFFORT matches both reliable and best-effort IMU publishers,
+        # same as FAST-LIO's own SensorDataQoS() subscription
+        imu_qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=100,
+                             reliability=ReliabilityPolicy.BEST_EFFORT)
+        node.create_subscription(Imu,         self.imu_topic,   self._imu_cb, imu_qos)
 
         deadline = time.time() + self.timeout
         while time.time() < deadline and not self.done.is_set():
