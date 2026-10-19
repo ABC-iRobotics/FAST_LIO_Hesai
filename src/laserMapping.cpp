@@ -60,6 +60,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/io/pcd_io.h>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -104,6 +105,7 @@ double last_timestamp_lidar = 0, last_timestamp_imu = -1.0;
 double gyr_cov = 0.1, acc_cov = 0.1, b_gyr_cov = 0.0001, b_acc_cov = 0.0001;
 double imu_init_delay = 0.0, imu_init_duration = 0.0;
 double filter_size_corner_min = 0, filter_size_surf_min = 0, filter_size_map_min = 0, fov_deg = 0;
+double filter_size_surf_body = 0;
 double cube_len = 0, HALF_FOV_COS = 0, FOV_DEG = 0, total_distance = 0, lidar_end_time = 0, first_lidar_time = 0.0;
 int    effct_feat_num = 0, time_log_counter = 0, scan_count = 0, publish_count = 0;
 int    iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudValidNum = 0, pcd_save_interval = -1, pcd_index = 0;
@@ -137,6 +139,7 @@ PointCloudXYZI::Ptr _featsArray;
 
 pcl::VoxelGrid<PointType> downSizeFilterSurf;
 pcl::VoxelGrid<PointType> downSizeFilterMap;
+pcl::ApproximateVoxelGrid<PointType> downSizeFilterSurfBody;
 
 KD_TREE<PointType> ikdtree;
 
@@ -646,6 +649,14 @@ void publish_frame_body(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::Shared
                             &laserCloudIMUBody->points[i]);
     }
 
+    if (filter_size_surf_body > 0)
+    {
+        PointCloudXYZI::Ptr laserCloudIMUBodyDown(new PointCloudXYZI());
+        downSizeFilterSurfBody.setInputCloud(laserCloudIMUBody);
+        downSizeFilterSurfBody.filter(*laserCloudIMUBodyDown);
+        laserCloudIMUBody = laserCloudIMUBodyDown;
+    }
+
     sensor_msgs::msg::PointCloud2 laserCloudmsg;
     pcl::toROSMsg(*laserCloudIMUBody, laserCloudmsg);
     laserCloudmsg.header.stamp = get_ros_time(lidar_end_time);
@@ -940,6 +951,7 @@ public:
         this->declare_parameter<double>("common.time_offset_lidar_to_imu", 0.0);
         this->declare_parameter<double>("filter_size_corner", 0.5);
         this->declare_parameter<double>("filter_size_surf", 0.5);
+        this->declare_parameter<double>("filter_size_surf_body", 0.0);
         this->declare_parameter<double>("filter_size_map", 0.5);
         this->declare_parameter<double>("cube_side_length", 200.);
         this->declare_parameter<float>("mapping.det_range", 300.);
@@ -981,6 +993,7 @@ public:
         this->get_parameter_or<double>("common.time_offset_lidar_to_imu", time_diff_lidar_to_imu, 0.0);
         this->get_parameter_or<double>("filter_size_corner",filter_size_corner_min,0.5);
         this->get_parameter_or<double>("filter_size_surf",filter_size_surf_min,0.5);
+        this->get_parameter_or<double>("filter_size_surf_body",filter_size_surf_body,0.0);
         this->get_parameter_or<double>("filter_size_map",filter_size_map_min,0.5);
         this->get_parameter_or<double>("cube_side_length",cube_len,200.f);
         this->get_parameter_or<float>("mapping.det_range",DET_RANGE,300.f);
@@ -1071,6 +1084,8 @@ public:
         memset(res_last, -1000.0f, sizeof(res_last));
         downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min);
         downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
+        if (filter_size_surf_body > 0)
+            downSizeFilterSurfBody.setLeafSize(filter_size_surf_body, filter_size_surf_body, filter_size_surf_body);
         memset(point_selected_surf, true, sizeof(point_selected_surf));
         memset(res_last, -1000.0f, sizeof(res_last));
 

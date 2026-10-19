@@ -1,5 +1,7 @@
 /**:
   ros__parameters:
+    filter_size_surf_body: 0.0       # ApproximateVoxelGrid leaf size (m) for /cloud_registered_body; 0: no downsampling
+
     common:
       lid_topic: "/lidar_points"
       imu_topic: "/lidar_imu"
